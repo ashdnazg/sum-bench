@@ -2,6 +2,8 @@
 #![feature(core_intrinsics)]
 use std::intrinsics::fadd_algebraic;
 
+mod fsum32;
+
 pub fn naive_sum(arr: &[f32]) -> f32 {
     let mut sum = 0.0;
     for x in arr {
@@ -93,6 +95,10 @@ pub fn crate_accurate_buffer(arr: &[f32]) -> f32 {
 
 pub fn crate_fsum(arr: &[f32]) -> f32 {
     fsum::FSum::with_all(arr.iter().map(|x| *x as f64)).value() as f32
+}
+
+pub fn crate_fsum32(arr: &[f32]) -> f32 {
+    fsum32::FSum::with_all(arr.iter().map(|x| *x as f64)).value() as f32
 }
 
 fn sum_block(arr: &[f32]) -> f32 {
