@@ -180,6 +180,7 @@ impl FSum {
     pub fn add_all<InIter, Bf64>(&mut self, values: InIter) -> &mut FSum
         where Bf64: Borrow<f64>, InIter: IntoIterator<Item=Bf64>
     {
+        self.partials.resize(self.partials.len().next_multiple_of(Self::SIMD_SIZE), 0.0);
         let mut iter = values.into_iter();
         loop {
             let chunk: [Option<Bf64>; Self::SIMD_SIZE] = core::array::from_fn(|_| iter.next());
@@ -192,6 +193,8 @@ impl FSum {
                 break;
             }
         }
+
+        self.partials.sort_unstable_by(|a, b| if a > b { std::cmp::Ordering::Greater } else { std::cmp::Ordering::Less });
 
         self
     }
@@ -213,20 +216,16 @@ impl FSum {
     /// ```
     pub fn value(&self) -> f64 {
         // https://github.com/python/cpython/blob/2b7411df5ca0b6ef714377730fd4d94693f26abd/Lib/test/test_math.py#L647
-        let mut merged = Self::new();
-        for f in self.partials.iter() {
-            merged.add(*f);
-        }
 
-        let mut n = merged.partials.len();
+        let mut n = self.partials.len();
         if n == 0 { return 0.0; }
         n -= 1;
-        let mut total = merged.partials[n];
+        let mut total = self.partials[n];
         if n == 0 { return total; }
         loop {  // sum partials from the top, stop when the sum becomes inexact:
             let old_total = total;
             n -= 1;
-            let x = merged.partials[n];
+            let x = self.partials[n];
             total = old_total + x;
             if n == 0 { return total; }
             let error = x - (total - old_total);
@@ -236,7 +235,7 @@ impl FSum {
                     digit to two instead of down to zero (the 1e-16 makes the 1
                     slightly closer to two).  With a potential 1 ULP rounding
                     error fixed-up, math.fsum() can guarantee commutativity. */
-                if (error < 0.0 && merged.partials[n - 1] < 0.0) || (error > 0.0 && merged.partials[n - 1] > 0.0) {
+                if (error < 0.0 && self.partials[n - 1] < 0.0) || (error > 0.0 && self.partials[n - 1] > 0.0) {
                     let y = error * 2.0;
                     let x = total + y;
                     if y == x - total { return x; }
